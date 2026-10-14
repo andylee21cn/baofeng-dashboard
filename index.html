@@ -11,6 +11,33 @@
     <link rel="stylesheet" crossorigin href="./assets/index-DKOxPpmM.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
+    <script>
+      (function () {
+        function showErr(m) {
+          var r = document.getElementById('root');
+          if (!r) return;
+          var p = document.createElement('pre');
+          p.style.cssText = 'color:#f87171;padding:24px;white-space:pre-wrap;font-size:13px';
+          p.textContent = m;
+          r.appendChild(p);
+        }
+        window.addEventListener('error', function (e) {
+          showErr('ERR: ' + e.message + '\n' + (e.error && e.error.stack ? e.error.stack.slice(0, 1500) : ''));
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          showErr('REJ: ' + String(e.reason && e.reason.stack ? e.reason.stack.slice(0, 1500) : e.reason));
+        });
+        var ce = console.error.bind(console);
+        console.error = function () {
+          try { showErr('CONSOLE: ' + Array.prototype.map.call(arguments, function (x) { return String(x && x.stack ? x.stack.slice(0, 1500) : x); }).join(' ').slice(0, 2000)); } catch (_) {}
+          ce.apply(null, arguments);
+        };
+        setTimeout(function () {
+          var r = document.getElementById('root');
+          if (r && !r.children.length) showErr('NO-RENDER: 5s 后 root 仍为空');
+        }, 5000);
+      })();
+    </script>
   </body>
 </html>
