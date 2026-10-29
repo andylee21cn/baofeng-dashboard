@@ -1,0 +1,71 @@
+name: 每日更新看板数据
+
+on:
+  schedule:
+    # 北京时间周一至周五 10:30（UTC 02:30）
+    - cron: '30 2 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dashboard-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: 抓取数据并生成 marketData.ts
+        env:
+          SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
+        run: python scripts/update_data.py
+
+      - name: 构建看板
+        working-directory: app
+        run: |
+          npm ci
+          npm run build
+
+      - name: 发布到 gh-pages
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git fetch origin gh-pages
+          git worktree add .deploy gh-pages
+          find .deploy -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r app/dist/* .deploy/
+          touch .deploy/.nojekyll
+          cd .deploy
+          git add -A
+          if git status --porcelain | grep -q .; then
+            git commit -m "auto update $(date -u +'%Y-%m-%d %H:%M') UTC"
+            git push origin gh-pages
+          else
+            echo "no-change"
+          fi
+
+      - name: 提交数据存档回 main
+        run: |
+          git add data/ app/src/data/marketData.ts summary.md
+          if git status --porcelain | grep -q .; then
+            git commit -m "data: $(date -u +'%Y-%m-%d')"
+            git push origin main
+          else
+            echo "no-change"
+          fi
